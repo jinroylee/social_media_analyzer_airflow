@@ -6,6 +6,10 @@ from airflow.models import Variable
 import sys
 import os
 import logging
+from airflow.providers.amazon.aws.operators.sagemaker import SageMakerTrainingOperator
+from airflow.utils.trigger_rule import TriggerRule
+import datetime as dt
+from airflow.operators.python import PythonOperator
 
 # Add your project root to Python path
 sys.path.append('/opt/airflow/ml_pipeline')
@@ -62,7 +66,7 @@ def train_model(**context):
         logger.info("Starting model training...")
         
         # Import your training module
-        from modelfactory.train import main as train_main
+        from data_backup.train import main as train_main
         
         # Run training
         train_main()
@@ -116,19 +120,67 @@ def cleanup_resources(**context):
         logger.warning(f"Cleanup warning (non-critical): {str(e)}")
         return "cleanup_completed_with_warnings"
 
+def build_training_config(**ctx):
+    timestamp = dt.datetime.utcnow().strftime("%Y%m%d%H%M%S")
+    return {
+        "TrainingJobName": f"clip-lora-{timestamp}",
+        "AlgorithmSpecification": {
+            "TrainingImage": (
+                "777022888924.dkr.ecr.ap-northeast-2.amazonaws.com/sagemaker-training"
+            ),
+            "TrainingInputMode": "File"
+        },
+        "RoleArn": "arn:aws:iam::777022888924:role/SageMakerExecRole",
+        "ResourceConfig": {
+            "InstanceType": "ml.g5.2xlarge",   # 1× RTX A10 ≈ 4090
+            "InstanceCount": 1,
+            "VolumeSizeInGB": 100
+        },
+        "InputDataConfig": [
+            {
+                "ChannelName": "train",
+                "DataSource": {
+                    "S3DataSource": {
+                        "S3DataType": "S3Prefix",
+                        "S3Uri": "s3://socialmediaanalyzer/processed/",
+                        "S3DataDistributionType": "FullyReplicated"
+                    }
+                }
+            }
+        ],
+        "OutputDataConfig": {
+            "S3OutputPath": "s3://socialmediaanalyzer/models/"
+        },
+        # Optional hyperparameters visible as env vars
+        "HyperParameters": {
+            "epochs": "10",
+            "freeze_epochs": "5",
+            "lr": "1e-4"
+        },
+        "StoppingCondition": { "MaxRuntimeInSeconds": 60*60*4 }
+    }
+
+build_cfg = PythonOperator(
+    task_id="build_sagemaker_config",
+    python_callable=build_training_config,
+    do_xcom_push=True,
+    dag=dag,
+)
+
+train_gpu = SageMakerTrainingOperator(
+    task_id="gpu_train_clip_lora",
+    config="{{ ti.xcom_pull(task_ids='build_sagemaker_config') }}",
+    aws_conn_id="aws_default",
+    wait_for_completion=True,
+    dag=dag,
+)
+
 # Define tasks
 preprocess_task = PythonOperator(
     task_id='preprocess_data',
     python_callable=preprocess_data,
     dag=dag,
     pool='ml_pool',  # We'll create this pool to limit concurrent ML tasks
-)
-
-train_task = PythonOperator(
-    task_id='train_model',
-    python_callable=train_model,
-    dag=dag,
-    pool='ml_pool',
 )
 
 test_task = PythonOperator(
@@ -170,7 +222,12 @@ failure_notification = EmailOperator(
     trigger_rule='one_failed',
 )
 
-# Define task dependencies
-preprocess_task >> train_task >> test_task >> success_notification
-preprocess_task >> train_task >> test_task >> cleanup_task
-[preprocess_task, train_task, test_task] >> failure_notification 
+# Main flow
+preprocess_task >> build_cfg >> train_gpu >> test_task
+
+# Success/final steps
+test_task >> success_notification
+test_task >> cleanup_task
+
+# Notify on failure (any critical step)
+[preprocess_task, build_cfg, train_gpu, test_task] >> failure_notification

@@ -262,7 +262,7 @@ def save_pkl_to_s3(data, bucket_name, key):
 def main():
     print("Starting data preprocessing...")
     print(f"Loading data from S3 bucket: {S3_BUCKET_NAME}")
-    print(f"Using credential: {boto3.client('sts').get_caller_identity()}")
+    
     # Load parquet data from S3
     df = load_parquet_from_s3(S3_BUCKET_NAME, "raw/data/tiktok_data.parquet")
 
