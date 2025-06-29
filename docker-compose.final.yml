@@ -12,13 +12,14 @@ x-airflow-common:
     AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
     AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
-    _PIP_ADDITIONAL_REQUIREMENTS: 'apache-airflow-providers-amazon boto3 python-dotenv textblob scikit-learn pandas numpy'
+    _PIP_ADDITIONAL_REQUIREMENTS: 'apache-airflow-providers-amazon boto3 python-dotenv textblob scikit-learn pandas numpy mlflow'
   volumes:
     - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
     - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
     - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
     - ${AIRFLOW_PROJ_DIR:-.}/data:/opt/airflow/data
     - ${AIRFLOW_PROJ_DIR:-.}/models:/opt/airflow/models
+    - ${AIRFLOW_PROJ_DIR:-.}/mlruns:/opt/airflow/mlruns
     - ${AIRFLOW_PROJ_DIR:-.}/.env:/opt/airflow/.env
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
@@ -63,6 +64,21 @@ services:
       timeout: 10s
       retries: 5
       start_period: 30s
+    restart: always
+
+  mlflow:
+    image: python:3.9-slim
+    ports:
+      - "5001:5000"
+    environment:
+      - MLFLOW_HOST=0.0.0.0
+      - MLFLOW_PORT=5000
+    volumes:
+      - ${AIRFLOW_PROJ_DIR:-.}/mlruns:/mlflow/mlruns
+      - ${AIRFLOW_PROJ_DIR:-.}/start_mlflow.sh:/start_mlflow.sh
+      - ${AIRFLOW_PROJ_DIR:-.}/gunicorn_config.py:/gunicorn_config.py
+    working_dir: /mlflow
+    command: bash /start_mlflow.sh
     restart: always
 
 volumes:
