@@ -26,7 +26,6 @@ class MLflowTracker:
         """
         self.experiment_name = experiment_name
         
-        tracking_uri = "https://mlflow-server-lb-780614927.ap-northeast-2.elb.amazonaws.com"
         # Set tracking URI (default to local file store)
         if tracking_uri:
             mlflow.set_tracking_uri(tracking_uri)

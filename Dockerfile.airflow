@@ -1,0 +1,41 @@
+FROM apache/airflow:2.8.0
+
+# Switch to root user to install system dependencies
+USER root
+
+# Install system dependencies for ML libraries
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    git \
+    curl \
+    build-essential \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Switch back to airflow user
+USER airflow
+
+# Upgrade pip and install wheel for better package compilation
+RUN pip install --upgrade pip setuptools wheel
+
+# Copy requirements file
+COPY requirements.txt /opt/airflow/requirements.txt
+
+# Install Python dependencies with better error handling
+RUN pip install --no-cache-dir --timeout=1000 -r /opt/airflow/requirements.txt || \
+    (echo "Some packages failed to install, trying individual installation..." && \
+     pip install --no-cache-dir apache-airflow-providers-amazon && \
+     pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu && \
+     pip install --no-cache-dir transformers scikit-learn pandas numpy Pillow tqdm && \
+     pip install --no-cache-dir boto3 botocore python-dotenv && \
+     pip install --no-cache-dir mlflow && \
+     pip install --no-cache-dir scipy matplotlib seaborn textblob)
+
+# Create necessary directories
+RUN mkdir -p /opt/airflow/data /opt/airflow/models /opt/airflow/outputs
+
+# Set environment variables
+ENV PYTHONPATH="${PYTHONPATH}:/opt/airflow/ml_pipeline"
+ENV ENVIRONMENT=local
+ENV USE_S3_MODEL=false 

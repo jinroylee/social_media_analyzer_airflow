@@ -1,0 +1,32 @@
+[2025-06-29T14:11:46.535+0000] {processor.py:161} INFO - Started process (PID=195) to work on /opt/airflow/dags/ml_pipeline_dag.py
+[2025-06-29T14:11:46.536+0000] {processor.py:830} INFO - Processing file /opt/airflow/dags/ml_pipeline_dag.py for tasks to queue
+[2025-06-29T14:11:46.538+0000] {logging_mixin.py:188} INFO - [2025-06-29T14:11:46.537+0000] {dagbag.py:538} INFO - Filling up the DagBag from /opt/airflow/dags/ml_pipeline_dag.py
+[2025-06-29T14:11:46.563+0000] {processor.py:840} INFO - DAG(s) 'ml_engagement_prediction_pipeline' retrieved from /opt/airflow/dags/ml_pipeline_dag.py
+[2025-06-29T14:11:46.719+0000] {logging_mixin.py:188} INFO - [2025-06-29T14:11:46.718+0000] {override.py:1769} INFO - Created Permission View: can read on DAG:ml_engagement_prediction_pipeline
+[2025-06-29T14:11:46.726+0000] {logging_mixin.py:188} INFO - [2025-06-29T14:11:46.726+0000] {override.py:1769} INFO - Created Permission View: can edit on DAG:ml_engagement_prediction_pipeline
+[2025-06-29T14:11:46.730+0000] {logging_mixin.py:188} INFO - [2025-06-29T14:11:46.730+0000] {override.py:1769} INFO - Created Permission View: can delete on DAG:ml_engagement_prediction_pipeline
+[2025-06-29T14:11:46.731+0000] {logging_mixin.py:188} INFO - [2025-06-29T14:11:46.730+0000] {dag.py:3033} INFO - Sync 1 DAGs
+[2025-06-29T14:11:46.739+0000] {logging_mixin.py:188} INFO - [2025-06-29T14:11:46.739+0000] {dag.py:3055} INFO - Creating ORM DAG for ml_engagement_prediction_pipeline
+[2025-06-29T14:11:46.740+0000] {logging_mixin.py:188} INFO - [2025-06-29T14:11:46.740+0000] {dag.py:3820} INFO - Setting next_dagrun for ml_engagement_prediction_pipeline to None, run_after=None
+[2025-06-29T14:11:46.756+0000] {processor.py:183} INFO - Processing /opt/airflow/dags/ml_pipeline_dag.py took 0.225 seconds
+[2025-06-29T14:12:16.916+0000] {processor.py:161} INFO - Started process (PID=206) to work on /opt/airflow/dags/ml_pipeline_dag.py
+[2025-06-29T14:12:16.918+0000] {processor.py:830} INFO - Processing file /opt/airflow/dags/ml_pipeline_dag.py for tasks to queue
+[2025-06-29T14:12:16.920+0000] {logging_mixin.py:188} INFO - [2025-06-29T14:12:16.919+0000] {dagbag.py:538} INFO - Filling up the DagBag from /opt/airflow/dags/ml_pipeline_dag.py
+[2025-06-29T14:12:16.948+0000] {processor.py:840} INFO - DAG(s) 'ml_engagement_prediction_pipeline' retrieved from /opt/airflow/dags/ml_pipeline_dag.py
+[2025-06-29T14:12:17.004+0000] {logging_mixin.py:188} INFO - [2025-06-29T14:12:17.004+0000] {dag.py:3033} INFO - Sync 1 DAGs
+[2025-06-29T14:12:17.022+0000] {logging_mixin.py:188} INFO - [2025-06-29T14:12:17.022+0000] {dag.py:3820} INFO - Setting next_dagrun for ml_engagement_prediction_pipeline to None, run_after=None
+[2025-06-29T14:12:17.039+0000] {processor.py:183} INFO - Processing /opt/airflow/dags/ml_pipeline_dag.py took 0.134 seconds
+[2025-06-29T14:12:47.326+0000] {processor.py:161} INFO - Started process (PID=216) to work on /opt/airflow/dags/ml_pipeline_dag.py
+[2025-06-29T14:12:47.327+0000] {processor.py:830} INFO - Processing file /opt/airflow/dags/ml_pipeline_dag.py for tasks to queue
+[2025-06-29T14:12:47.330+0000] {logging_mixin.py:188} INFO - [2025-06-29T14:12:47.329+0000] {dagbag.py:538} INFO - Filling up the DagBag from /opt/airflow/dags/ml_pipeline_dag.py
+[2025-06-29T14:12:47.406+0000] {processor.py:840} INFO - DAG(s) 'ml_engagement_prediction_pipeline' retrieved from /opt/airflow/dags/ml_pipeline_dag.py
+[2025-06-29T14:12:47.464+0000] {logging_mixin.py:188} INFO - [2025-06-29T14:12:47.464+0000] {dag.py:3033} INFO - Sync 1 DAGs
+[2025-06-29T14:12:47.482+0000] {logging_mixin.py:188} INFO - [2025-06-29T14:12:47.482+0000] {dag.py:3820} INFO - Setting next_dagrun for ml_engagement_prediction_pipeline to None, run_after=None
+[2025-06-29T14:12:47.501+0000] {processor.py:183} INFO - Processing /opt/airflow/dags/ml_pipeline_dag.py took 0.186 seconds
+[2025-06-29T14:13:17.597+0000] {processor.py:161} INFO - Started process (PID=227) to work on /opt/airflow/dags/ml_pipeline_dag.py
+[2025-06-29T14:13:17.598+0000] {processor.py:830} INFO - Processing file /opt/airflow/dags/ml_pipeline_dag.py for tasks to queue
+[2025-06-29T14:13:17.600+0000] {logging_mixin.py:188} INFO - [2025-06-29T14:13:17.599+0000] {dagbag.py:538} INFO - Filling up the DagBag from /opt/airflow/dags/ml_pipeline_dag.py
+[2025-06-29T14:13:17.611+0000] {processor.py:840} INFO - DAG(s) 'ml_engagement_prediction_pipeline' retrieved from /opt/airflow/dags/ml_pipeline_dag.py
+[2025-06-29T14:13:17.641+0000] {logging_mixin.py:188} INFO - [2025-06-29T14:13:17.641+0000] {dag.py:3033} INFO - Sync 1 DAGs
+[2025-06-29T14:13:17.650+0000] {logging_mixin.py:188} INFO - [2025-06-29T14:13:17.650+0000] {dag.py:3820} INFO - Setting next_dagrun for ml_engagement_prediction_pipeline to None, run_after=None
+[2025-06-29T14:13:17.661+0000] {processor.py:183} INFO - Processing /opt/airflow/dags/ml_pipeline_dag.py took 0.067 seconds
