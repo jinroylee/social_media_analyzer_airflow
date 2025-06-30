@@ -13,47 +13,71 @@ class MLflowTracker:
     """MLflow experiment tracking utility for social media engagement prediction."""
     
     def __init__(self, 
-                 experiment_name: str = "social_media_engagement_prediction",
+                 experiment_name: Optional[str] = None,
                  tracking_uri: Optional[str] = None,
                  artifact_location: Optional[str] = None):
         """
         Initialize MLflow tracker.
         
         Args:
-            experiment_name: Name of the MLflow experiment
-            tracking_uri: MLflow tracking server URI (default: local file store)
-            artifact_location: Location to store artifacts
+            experiment_name: Name of the MLflow experiment (default from env)
+            tracking_uri: MLflow tracking server URI (default from env)
+            artifact_location: Location to store artifacts (default from env)
         """
-        self.experiment_name = experiment_name
+        # Get configuration from environment variables
+        self.experiment_name = experiment_name or os.getenv('MLFLOW_EXPERIMENT_NAME', 'social_media_engagement_prediction')
+        tracking_uri = tracking_uri or os.getenv('MLFLOW_TRACKING_URI')
+        artifact_location = artifact_location or os.getenv('MLFLOW_ARTIFACT_ROOT')
         
-        # Set tracking URI (default to local file store)
+        # Set tracking URI
         if tracking_uri:
             mlflow.set_tracking_uri(tracking_uri)
+            logger.info(f"Using MLflow tracking URI: {tracking_uri}")
         else:
-            # Use local directory for MLflow tracking
+            # Fallback to local directory for MLflow tracking
             mlflow_dir = os.path.join(os.getcwd(), "mlruns")
             mlflow.set_tracking_uri(f"file://{mlflow_dir}")
+            logger.info(f"Using local MLflow tracking: file://{mlflow_dir}")
         
         # Create or get experiment
         try:
             self.experiment_id = mlflow.create_experiment(
-                name=experiment_name,
+                name=self.experiment_name,
                 artifact_location=artifact_location
             )
+            logger.info(f"Created new MLflow experiment: {self.experiment_name}")
         except mlflow.exceptions.MlflowException:
             # Experiment already exists
-            experiment = mlflow.get_experiment_by_name(experiment_name)
-            self.experiment_id = experiment.experiment_id
+            experiment = mlflow.get_experiment_by_name(self.experiment_name)
+            if experiment:
+                self.experiment_id = experiment.experiment_id
+                logger.info(f"Using existing MLflow experiment: {self.experiment_name}")
+            else:
+                logger.error(f"Could not find or create experiment: {self.experiment_name}")
+                raise
         
-        logger.info(f"Using MLflow experiment: {experiment_name} (ID: {self.experiment_id})")
+        logger.info(f"MLflow experiment ID: {self.experiment_id}")
     
     def start_run(self, run_name: Optional[str] = None, tags: Optional[Dict[str, str]] = None):
         """Start a new MLflow run."""
-        return mlflow.start_run(
+        # Add default tags
+        default_tags = {
+            "environment": os.getenv('ENVIRONMENT', 'unknown'),
+            "use_s3_model": os.getenv('USE_S3_MODEL', 'false'),
+            "aws_region": os.getenv('AWS_REGION', 'unknown')
+        }
+        
+        if tags:
+            default_tags.update(tags)
+        
+        run = mlflow.start_run(
             experiment_id=self.experiment_id,
             run_name=run_name,
-            tags=tags
+            tags=default_tags
         )
+        
+        logger.info(f"Started MLflow run: {run.info.run_id}")
+        return run
     
     def log_hyperparameters(self, params: Dict[str, Any]):
         """Log hyperparameters to MLflow."""

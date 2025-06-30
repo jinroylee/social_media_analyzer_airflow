@@ -7,8 +7,19 @@ import sys
 import os
 import logging
 
+# Load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    load_dotenv('/opt/airflow/.env')
+    logging.info("Successfully loaded .env file")
+except ImportError:
+    logging.warning("python-dotenv not available, using system environment variables")
+except Exception as e:
+    logging.warning(f"Could not load .env file: {e}")
+
 # Add your project root to Python path
-sys.path.append('/opt/airflow/ml_pipeline')
+sys.path.append('/opt/airflow')
+sys.path.append('/opt/airflow/modelfactory')
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -30,18 +41,18 @@ default_args = {
 dag = DAG(
     'ml_engagement_prediction_pipeline',
     default_args=default_args,
-    description='Local ML pipeline for social media engagement prediction',
+    description='ML pipeline for social media engagement prediction with S3 models',
     schedule_interval=None,  # Manual trigger for local development
     start_date=datetime(2024, 1, 1),
     catchup=False,  # Don't run missed schedules
     max_active_runs=1,  # Only one instance running at a time
-    tags=['ml', 'local', 'engagement-prediction'],
+    tags=['ml', 'engagement-prediction', 's3'],
 )
 
 def check_local_environment(**context):
     """Check if running in local environment and setup paths"""
     try:
-        logger.info("Checking local environment setup...")
+        logger.info("Checking environment setup...")
         
         # Check environment variables
         env = os.getenv('ENVIRONMENT', 'unknown')
@@ -49,6 +60,7 @@ def check_local_environment(**context):
         
         logger.info(f"Environment: {env}")
         logger.info(f"Use S3 Model: {use_s3}")
+        logger.info(f"Python path: {sys.path}")
         
         # Check local directories
         data_path = '/opt/airflow/data'
@@ -59,14 +71,31 @@ def check_local_environment(**context):
             os.makedirs(path, exist_ok=True)
             logger.info(f"Directory ready: {path}")
         
-        # Check if sample data exists (create dummy data if needed)
-        sample_data_file = os.path.join(data_path, 'sample_data.txt')
-        if not os.path.exists(sample_data_file):
-            with open(sample_data_file, 'w') as f:
-                f.write("This is sample data for local development\n")
-            logger.info("Created sample data file for local development")
+        # Check if modelfactory is available
+        modelfactory_path = '/opt/airflow/modelfactory'
+        if os.path.exists(modelfactory_path):
+            logger.info(f"Modelfactory directory found: {modelfactory_path}")
+            files = os.listdir(modelfactory_path)
+            logger.info(f"Modelfactory contents: {files}")
+        else:
+            logger.warning(f"Modelfactory directory not found: {modelfactory_path}")
         
-        logger.info("Local environment check completed successfully")
+        # Test imports
+        try:
+            import modelfactory
+            logger.info("Successfully imported modelfactory package")
+        except ImportError as e:
+            logger.warning(f"Cannot import modelfactory: {e}")
+        
+        # Check AWS credentials
+        aws_key = os.getenv('AWS_ACCESS_KEY_ID', 'not_set')
+        aws_region = os.getenv('AWS_REGION', 'not_set')
+        s3_bucket = os.getenv('S3_BUCKET_NAME', 'not_set')
+        logger.info(f"AWS Key: {aws_key[:10]}... (truncated)")
+        logger.info(f"AWS Region: {aws_region}")
+        logger.info(f"S3 Bucket: {s3_bucket}")
+        
+        logger.info("Environment check completed successfully")
         return "environment_check_success"
         
     except Exception as e:
@@ -74,32 +103,48 @@ def check_local_environment(**context):
         raise
 
 def preprocess_data(**context):
-    """Task to preprocess data locally"""
+    """Task to preprocess data"""
     try:
-        logger.info("Starting local data preprocessing...")
+        logger.info("Starting data preprocessing...")
         
-        # Check if we're in local mode
+        # Check if we're in S3 mode
         use_s3 = os.getenv('USE_S3_MODEL', 'true').lower() == 'true'
         
-        if not use_s3:
-            logger.info("Running in local mode - using local data")
-            # For local development, create mock preprocessing
+        if use_s3:
+            logger.info("Running with S3 models - importing preprocessing module")
+            try:
+                # Import the preprocessing module
+                from modelfactory.preprocess.preprocess import main as preprocess_main
+                logger.info("Successfully imported preprocessing module")
+                
+                # Run the actual preprocessing
+                logger.info("Starting preprocessing execution...")
+                preprocess_main()
+                logger.info("Data preprocessing completed successfully")
+                
+            except ImportError as e:
+                logger.error(f"Failed to import preprocessing module: {e}")
+                logger.info("Available modules in modelfactory:")
+                modelfactory_path = '/opt/airflow/modelfactory'
+                if os.path.exists(modelfactory_path):
+                    for root, dirs, files in os.walk(modelfactory_path):
+                        for file in files:
+                            if file.endswith('.py'):
+                                logger.info(f"  {os.path.join(root, file)}")
+                raise
+            except Exception as e:
+                logger.error(f"Preprocessing execution failed: {e}")
+                raise
+        else:
+            logger.info("Running in local mode - using mock preprocessing")
+            # Create mock preprocessing
             data_path = '/opt/airflow/data'
             processed_file = os.path.join(data_path, 'processed_data.txt')
             
             with open(processed_file, 'w') as f:
-                f.write(f"Processed data - {datetime.now()}\n")
+                f.write(f"Mock processed data - {datetime.now()}\n")
             
             logger.info(f"Mock preprocessing completed - output: {processed_file}")
-        else:
-            # Import your preprocessing module (only if available)
-            try:
-                from modelfactory.preprocess.preprocess import main as preprocess_main
-                preprocess_main()
-                logger.info("Data preprocessing completed successfully")
-            except ImportError as e:
-                logger.warning(f"Preprocessing module not available: {e}")
-                logger.info("Running in mock mode for local development")
         
         return "preprocessing_success"
         
@@ -108,16 +153,34 @@ def preprocess_data(**context):
         raise
 
 def train_model(**context):
-    """Task to train the model locally"""
+    """Task to train the model"""
     try:
-        logger.info("Starting local model training...")
+        logger.info("Starting model training...")
         
-        # Check if we're in local mode
+        # Check if we're in S3 mode
         use_s3 = os.getenv('USE_S3_MODEL', 'true').lower() == 'true'
         
-        if not use_s3:
+        if use_s3:
+            logger.info("Running with S3 models - importing training module")
+            try:
+                # Import the training module
+                from modelfactory.train import main as train_main
+                logger.info("Successfully imported training module")
+                
+                # Run the actual training
+                logger.info("Starting training execution...")
+                train_main()
+                logger.info("Model training completed successfully")
+                
+            except ImportError as e:
+                logger.error(f"Failed to import training module: {e}")
+                raise
+            except Exception as e:
+                logger.error(f"Training execution failed: {e}")
+                raise
+        else:
             logger.info("Running in local mode - using mock training")
-            # For local development, create mock training
+            # Create mock training
             models_path = '/opt/airflow/models'
             model_file = os.path.join(models_path, 'trained_model.txt')
             
@@ -125,15 +188,6 @@ def train_model(**context):
                 f.write(f"Mock trained model - {datetime.now()}\n")
             
             logger.info(f"Mock training completed - output: {model_file}")
-        else:
-            # Import your training module (only if available)
-            try:
-                from modelfactory.train import main as train_main
-                train_main()
-                logger.info("Model training completed successfully")
-            except ImportError as e:
-                logger.warning(f"Training module not available: {e}")
-                logger.info("Running in mock mode for local development")
         
         return "training_success"
         
@@ -142,16 +196,34 @@ def train_model(**context):
         raise
 
 def test_model(**context):
-    """Task to test the model locally"""
+    """Task to test the model"""
     try:
-        logger.info("Starting local model testing...")
+        logger.info("Starting model testing...")
         
-        # Check if we're in local mode
+        # Check if we're in S3 mode
         use_s3 = os.getenv('USE_S3_MODEL', 'true').lower() == 'true'
         
-        if not use_s3:
+        if use_s3:
+            logger.info("Running with S3 models - importing testing module")
+            try:
+                # Import the testing module
+                from modelfactory.test import main as test_main
+                logger.info("Successfully imported testing module")
+                
+                # Run the actual testing
+                logger.info("Starting testing execution...")
+                test_main()
+                logger.info("Model testing completed successfully")
+                
+            except ImportError as e:
+                logger.error(f"Failed to import testing module: {e}")
+                raise
+            except Exception as e:
+                logger.error(f"Testing execution failed: {e}")
+                raise
+        else:
             logger.info("Running in local mode - using mock testing")
-            # For local development, create mock testing
+            # Create mock testing
             outputs_path = '/opt/airflow/outputs'
             results_file = os.path.join(outputs_path, 'test_results.txt')
             
@@ -161,15 +233,6 @@ def test_model(**context):
                 f.write("F1 Score: 0.92\n")
             
             logger.info(f"Mock testing completed - output: {results_file}")
-        else:
-            # Import your testing module (only if available)
-            try:
-                from modelfactory.test import main as test_main
-                test_main()
-                logger.info("Model testing completed successfully")
-            except ImportError as e:
-                logger.warning(f"Testing module not available: {e}")
-                logger.info("Running in mock mode for local development")
         
         return "testing_success"
         
@@ -179,7 +242,7 @@ def test_model(**context):
 
 def notify_success(**context):
     """Send success notification"""
-    logger.info("Local pipeline completed successfully!")
+    logger.info("Pipeline completed successfully!")
     
     # Log summary of outputs
     outputs_path = '/opt/airflow/outputs'
@@ -195,8 +258,7 @@ def cleanup_resources(**context):
         logger.info("Cleaning up resources...")
         
         # Clear any temporary files if needed
-        # For local development, we might want to keep files for inspection
-        logger.info("Keeping output files for local inspection")
+        logger.info("Keeping output files for inspection")
         
         # Clear CUDA cache if available
         try:

@@ -14,7 +14,8 @@ x-airflow-common:
     AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
     AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
-    _PIP_ADDITIONAL_REQUIREMENTS: 'apache-airflow-providers-amazon boto3 python-dotenv textblob scikit-learn pandas numpy mlflow torch transformers'
+    # GPU-optimized package installation
+    _PIP_ADDITIONAL_REQUIREMENTS: 'apache-airflow-providers-amazon boto3 python-dotenv textblob scikit-learn pandas numpy mlflow torch==2.1.0+cu118 torchvision==0.16.0+cu118 torchaudio==2.1.0+cu118 transformers accelerate'
     # Environment variables from .env file
     USE_S3_MODEL: ${USE_S3_MODEL:-true}
     AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
@@ -23,7 +24,7 @@ x-airflow-common:
     AWS_REGION: ${AWS_REGION:-us-east-1}
     S3_BUCKET_NAME: ${S3_BUCKET_NAME}
     S3_MODEL_KEY: ${S3_MODEL_KEY:-models/best_model_lora.pth}
-    ENVIRONMENT: ${ENVIRONMENT:-local}
+    ENVIRONMENT: ${ENVIRONMENT:-runpod}
     DEBUG: ${DEBUG:-true}
     MODEL_PATH: ${MODEL_PATH:-models/best_model_lora.pth}
     USE_LORA: ${USE_LORA:-true}
@@ -34,6 +35,9 @@ x-airflow-common:
     MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-http://mlflow:5000}
     MLFLOW_EXPERIMENT_NAME: ${MLFLOW_EXPERIMENT_NAME:-social_media_engagement_prediction}
     MLFLOW_ARTIFACT_ROOT: ${MLFLOW_ARTIFACT_ROOT:-file:///opt/airflow/mlruns}
+    # GPU Configuration
+    NVIDIA_VISIBLE_DEVICES: all
+    CUDA_VISIBLE_DEVICES: 0
   volumes:
     - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
     - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
@@ -47,6 +51,14 @@ x-airflow-common:
     - ${AIRFLOW_PROJ_DIR:-.}/outputs:/opt/airflow/outputs
     - ${AIRFLOW_PROJ_DIR:-.}/requirements.txt:/opt/airflow/requirements.txt
   user: "${AIRFLOW_UID:-50000}:0"
+  # GPU access for ML training
+  deploy:
+    resources:
+      reservations:
+        devices:
+          - driver: nvidia
+            count: all
+            capabilities: [gpu]
   depends_on:
     postgres:
       condition: service_healthy
@@ -90,6 +102,11 @@ services:
       retries: 5
       start_period: 30s
     restart: always
+    # GPU access for ML tasks
+    runtime: nvidia
+    environment:
+      <<: *airflow-common-env
+      NVIDIA_VISIBLE_DEVICES: all
 
   mlflow:
     image: python:3.9-slim
@@ -98,6 +115,8 @@ services:
     environment:
       - MLFLOW_HOST=0.0.0.0
       - MLFLOW_PORT=5000
+      - MLFLOW_BACKEND_STORE_URI=file:///mlflow/mlruns
+      - MLFLOW_DEFAULT_ARTIFACT_ROOT=file:///mlflow/mlruns
     volumes:
       - ${AIRFLOW_PROJ_DIR:-.}/mlruns:/mlflow/mlruns
       - ${AIRFLOW_PROJ_DIR:-.}/start_mlflow.sh:/start_mlflow.sh
