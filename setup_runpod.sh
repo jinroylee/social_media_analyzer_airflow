@@ -20,9 +20,10 @@ if ! command -v docker &> /dev/null; then
     apt-get update
     apt-get install -y docker-ce docker-ce-cli containerd.io
     
-    # Start and enable Docker
-    systemctl start docker
-    systemctl enable docker
+    # Start Docker daemon manually (RunPod doesn't use systemd)
+    echo "🔧 Starting Docker daemon..."
+    dockerd > /dev/null 2>&1 &
+    sleep 5
     
     # Add current user to docker group (if not root)
     if [ "$EUID" -ne 0 ]; then
@@ -31,6 +32,12 @@ if ! command -v docker &> /dev/null; then
     fi
 else
     echo "✅ Docker already installed"
+    # Check if Docker daemon is running
+    if ! docker info > /dev/null 2>&1; then
+        echo "🔧 Starting Docker daemon..."
+        dockerd > /dev/null 2>&1 &
+        sleep 5
+    fi
 fi
 
 # Install Docker Compose
@@ -47,14 +54,35 @@ fi
 echo "🎮 Installing NVIDIA Container Toolkit..."
 if ! command -v nvidia-container-runtime &> /dev/null; then
     distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
-    curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | apt-key add -
-    curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | tee /etc/apt/sources.list.d/nvidia-docker.list
+    # Use newer GPG key method for Ubuntu 22.04 compatibility
+    curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+    curl -s -L https://nvidia.github.io/libnvidia-container/$distribution/libnvidia-container.list | \
+        sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
+        tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
     
     apt-get update
     apt-get install -y nvidia-container-toolkit nvidia-container-runtime
     
-    # Restart Docker to pick up the new runtime
-    systemctl restart docker
+    # Configure Docker daemon for GPU support (RunPod specific)
+    echo "🔧 Configuring Docker for GPU support..."
+    mkdir -p /etc/docker
+    cat > /etc/docker/daemon.json <<EOF
+{
+    "default-runtime": "nvidia",
+    "runtimes": {
+        "nvidia": {
+            "path": "nvidia-container-runtime",
+            "runtimeArgs": []
+        }
+    }
+}
+EOF
+    
+    # Restart Docker daemon
+    pkill dockerd || true
+    sleep 2
+    dockerd > /dev/null 2>&1 &
+    sleep 5
 else
     echo "✅ NVIDIA Container Toolkit already installed"
 fi
@@ -81,9 +109,10 @@ echo "✅ RunPod setup complete!"
 echo ""
 echo "🔥 Next steps:"
 echo "1. Update your .env file with RunPod-specific settings"
-echo "2. Run: docker-compose -f docker-compose.final.yml up -d"
+echo "2. Run: docker-compose -f docker-compose.runpod.yml up -d"
 echo "3. Access services:"
 echo "   - Airflow: http://<runpod-ip>:8080"
 echo "   - MLflow: http://<runpod-ip>:5001"
 echo ""
-echo "💡 Don't forget to open ports 8080 and 5001 in RunPod!" 
+echo "💡 Don't forget to open ports 8080 and 5001 in RunPod!"
+echo "💡 Docker daemon is running in background. If you restart the container, run 'dockerd &' to start it again." 

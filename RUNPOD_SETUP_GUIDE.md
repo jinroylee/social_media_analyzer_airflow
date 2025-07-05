@@ -5,12 +5,32 @@
 - SSH access to your RunPod instance
 - Git installed on RunPod instance
 
+## ⚠️ Important Note for RunPod
+RunPod containers don't use systemd, so we've created RunPod-specific setup scripts that work with the container environment.
+
 ## 🔥 Quick Setup Commands
 
-After SSH-ing into your RunPod instance and cloning your repository:
+### Option 1: Simple Setup (Recommended)
+If Docker is already available in your RunPod instance:
 
 ```bash
-# 1. Make setup script executable and run it
+# 1. Make simple setup script executable and run it
+chmod +x setup_runpod_simple.sh
+sudo ./setup_runpod_simple.sh
+
+# 2. Copy and configure environment
+cp .env.runpod .env
+nano .env  # Update AWS credentials and RunPod IP
+
+# 3. Start the services
+docker-compose -f docker-compose.runpod.yml up -d
+```
+
+### Option 2: Full Setup
+If you need to install Docker from scratch:
+
+```bash
+# 1. Make full setup script executable and run it
 chmod +x setup_runpod.sh
 sudo ./setup_runpod.sh
 
@@ -20,9 +40,6 @@ nano .env  # Update AWS credentials and RunPod IP
 
 # 3. Start the services
 docker-compose -f docker-compose.runpod.yml up -d
-
-# 4. Check status
-docker-compose -f docker-compose.runpod.yml ps
 ```
 
 ## 📋 Detailed Setup Steps
@@ -40,20 +57,32 @@ git clone <your-repo-url>
 cd social_media_analyzer_airflow
 ```
 
-### Step 2: Run Setup Script
+### Step 2: Choose Your Setup Method
+
+**For Simple Setup (Docker already available):**
 ```bash
-# Make executable and run
+chmod +x setup_runpod_simple.sh
+sudo ./setup_runpod_simple.sh
+```
+
+**For Full Setup (Install Docker from scratch):**
+```bash
 chmod +x setup_runpod.sh
 sudo ./setup_runpod.sh
 ```
 
-This script will:
-- Install Docker and Docker Compose
-- Install NVIDIA Container Toolkit
-- Set up proper permissions
-- Test GPU access
+### Step 3: Manual Docker Start (If Needed)
+If Docker isn't running after setup:
+```bash
+# Start Docker daemon manually
+sudo dockerd > /dev/null 2>&1 &
+sleep 5
 
-### Step 3: Configure Environment
+# Verify Docker is running
+docker info
+```
+
+### Step 4: Configure Environment
 ```bash
 # Copy RunPod environment template
 cp .env.runpod .env
@@ -68,7 +97,7 @@ nano .env
 - `S3_BUCKET_NAME`: Your S3 bucket name
 - `RUNPOD_PUBLIC_IP`: Your RunPod instance public IP
 
-### Step 4: Configure RunPod Networking
+### Step 5: Configure RunPod Networking
 
 **In RunPod Web Interface:**
 1. Go to your pod details
@@ -78,7 +107,7 @@ nano .env
    - `5001` (MLflow Web UI)
 4. Note your public IP address
 
-### Step 5: Start Services
+### Step 6: Start Services
 ```bash
 # Start all services
 docker-compose -f docker-compose.runpod.yml up -d
@@ -125,26 +154,38 @@ The configuration includes:
 
 ### Common Issues
 
-**1. Docker Permission Denied**
+**1. "System has not been booted with systemd" Error**
+This is normal in RunPod containers. Use our RunPod-specific setup scripts that don't rely on systemd.
+
+**2. Docker Daemon Not Running**
+```bash
+# Start Docker daemon manually
+sudo dockerd > /dev/null 2>&1 &
+sleep 5
+
+# Check if it's running
+docker info
+```
+
+**3. Docker Permission Denied**
 ```bash
 sudo usermod -aG docker $USER
 newgrp docker
 ```
 
-**2. GPU Not Accessible in Container**
+**4. GPU Not Accessible in Container**
 ```bash
-# Restart Docker daemon
-sudo systemctl restart docker
+# Test GPU access
+docker run --rm --gpus all nvidia/cuda:11.8-base-ubuntu20.04 nvidia-smi
 
-# Check NVIDIA runtime
-docker info | grep nvidia
+# If that fails, you may need to configure NVIDIA Container Toolkit
 ```
 
-**3. Port Access Issues**
+**5. Port Access Issues**
 - Ensure ports 8080 and 5001 are exposed in RunPod
 - Check firewall settings: `sudo ufw status`
 
-**4. Out of GPU Memory**
+**6. Out of GPU Memory**
 - Reduce batch size in `.env`: `BATCH_SIZE=8`
 - Enable gradient checkpointing in training code
 - Use mixed precision training
